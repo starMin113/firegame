@@ -4,6 +4,9 @@
 
 ## 项目入口
 
+- `docs/production-workflow.md`：商业化项目的阶段、验收、协作与发布工作流。
+- `docs/unity-first-slice.md`：Unity 首个可玩切片的技术方案、准备任务和验收清单。
+- `Assets/`、`Packages/`、`ProjectSettings/`：Unity 工程；使用工程记录的 Unity 版本打开仓库根目录。
 - `game-design.md`：当前已确认设计与五关原型规则。
 - `docs/firefighter-rescue-mvp-design-discussion.md`：设计讨论记录，包含待验证想法；不自动作为正式需求。
 - `docs/firefighter_rescue_30_level_stress_test.xlsx`：30 关纸面压力测试和母题索引，不代表 30 关已制作完成。
@@ -12,6 +15,8 @@
 - `docs/cocos-project-package.original.json`：原目录的 Cocos Creator 3.8.8 项目标识备份；当前没有完整 Cocos 工程，勿作为根目录 npm 工程使用。
 
 ## 本地体验
+
+Unity：通过 Unity Hub 打开本目录。当前处于工程准备阶段，尚未实现 Unity 可玩版本；Web 五关已实现不代表 Unity 五关已完成。
 
 直接用浏览器打开 `mvp/site/public/game.html`。该页面仍依赖联网加载 React 和 Babel。
 
