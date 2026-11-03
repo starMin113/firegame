@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="creative-medium" content="interactive-prototype">
+  <title>消防调度救援 - MVP原型</title>
+  <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #1a1d29;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .app-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+    }
+    .app-title span { color: #ff6b4a; }
+
+    /* ===== 顶部状态栏 ===== */
+    .status-bar {
+      display: flex;
+      gap: 16px;
+      background: #252938;
+      border-radius: 12px;
+      padding: 12px 20px;
+      margin-bottom: 12px;
+      border: 1px solid #33384d;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      background: #1e2130;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .status-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .status-label { color: #8a90a8; font-size: 12px; }
+    .status-value { font-weight: 700; font-size: 16px; color: #fff; }
+    .status-value.warn { color: #ffb84a; }
+    .status-value.danger { color: #ff6b6b; }
+    .status-value.good { color: #4ade80; }
+
+    /* ===== 主体布局 ===== */
+    .main-layout {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    /* ===== 左侧工具栏 ===== */
+    .toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #252938;
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid #33384d;
+      width: 120px;
+    }
+    .tool-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 8px;
+      background: #1e2130;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      color: #8a90a8;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .tool-btn:hover {
+      background: #2a2f42;
+      color: #fff;
+    }
+    .tool-btn.active {
+      background: #ff6b4a;
+      border-color: #ff8a6a;
+      color: #fff;
+    }
+    .tool-btn .tool-icon {
+      font-size: 22px;
+      line-height: 1;
+    }
+    .tool-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .tool-divider {
+      height: 1px;
+      background: #33384d;
+      margin: 4px 0;
+    }
+    .tool-hint {
+      font-size: 10px;
+      color: #6a7088;
+      text-align: center;
+      padding: 4px 2px;
+      line-height: 1.4;
+    }
+
+    /* ===== 游戏画布 ===== */
+    .game-canvas-wrapper {
+      background: #252938;
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid #33384d;
+    }
+    .game-canvas {
+      display: grid;
+      gap: 1px;
+      background: #141620;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    .grid-cell {
+      width: 48px;
+      height: 48px;
+      position: relative;
+      cursor: default;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s;
+    }
+
+    /* 格子类型 */
+    .cell-sky { background: #2c3447; }
+    .cell-wall { background: #3d4252; }
+    .cell-floor { background: #5d4e3a; }
+    .cell-ground { background: #4a6b3a; }
+    .cell-empty { background: #1e2233; cursor: pointer; }
+    .cell-empty:hover { background: #2a3148; }
+    .cell-empty.pipe-hint:hover { background: #3a4f7a; }
+
+    /* 水管 */
+    .cell-pipe {
+      background: #2a3148;
+      cursor: pointer;
+    }
+    .pipe-segment {
+      position: absolute;
+      background: #6b8cff;
+      border-radius: 3px;
+    }
+    .pipe-horizontal {
+      width: 100%;
+      height: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 0;
+    }
+    .pipe-vertical {
+      height: 100%;
+      width: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+    }
+    .pipe-center {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #8faaff;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+    }
+
+    /* 同一格内使用固定图层：水管 < 可交互对象 < 迷雾 */
+    .pipe-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .pipe-water-effect {
+      z-index: 3;
+      pointer-events: none;
+    }
+    .entity-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .fire-entity,
+    .extinguisher-entity {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .fire-entity { z-index: 6; }
+    .extinguisher-entity { z-index: 5; }
+
+    /* 水管有水流动画 */
+    .pipe-water .pipe-segment {
+      background: #4db8ff;
+      box-shadow: 0 0 8px rgba(77, 184, 255, 0.5);
+    }
+    .pipe-water .pipe-center {
+      background: #7ed0ff;
+      box-shadow: 0 0 12px rgba(126, 208, 255, 0.7);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    /* 火点格上的水管 - 缩小显示在角落，避免遮挡火焰 */
+    .fire-cell .pipe-layer {
+      opacity: 0.6;
+      transform: scale(0.7);
+    }
+    .fire-cell .fire {
+      position: relative;
+      z-index: 5;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(126, 208, 255, 0.5); }
+      50% { box-shadow: 0 0 16px rgba(126, 208, 255, 0.9); }
+    }
+
+    /* 火点 */
+    .fire-cell { cursor: pointer; }
+    .fire {
+      width: 32px;
+      height: 36px;
+      position: relative;
+      animation: flicker 0.4s ease-in-out infinite alternate;
+    }
+    @keyframes flicker {
+      0% { transform: scale(1) rotate(-2deg); }
+      100% { transform: scale(1.08) rotate(2deg); }
+    }
+    .fire-large .fire { width: 40px; height: 44px; }
+    .fire-small .fire { width: 24px; height: 28px; }
+    .fire-flame {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-bottom: 28px solid #ff6b3d;
+    }
+    .fire-large .fire-flame {
+      border-left-width: 16px;
+      border-right-width: 16px;
+      border-bottom-width: 36px;
+    }
+    .fire-small .fire-flame {
+      border-left-width: 9px;
+      border-right-width: 9px;
+      border-bottom-width: 22px;
+    }
+    .fire-flame-inner {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-bottom: 18px solid #ffd93d;
+    }
+    .fire-large .fire-flame-inner {
+      border-left-width: 10px;
+      border-right-width: 10px;
+      border-bottom-width: 24px;
+    }
+    .fire-small .fire-flame-inner {
+      border-left-width: 5px;
+      border-right-width: 5px;
+      border-bottom-width: 14px;
+    }
+    .fire-water-label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: #4db8ff;
+      font-size: 11px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      white-space: nowrap;
+      font-weight: 700;
+      z-index: 5;
+    }
+    .fire-size-tag {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      background: #ff4444;
+      color: #fff;
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-weight: 700;
+      z-index: 5;
+    }
+
+    /* 已扑灭 */
+    .fire-out .fire {
+      animation: none;
+      opacity: 0.3;
+      filter: grayscale(1);
+    }
+    .fire-out .fire-water-label {
+      background: rgba(74, 222, 128, 0.2);
+      color: #4ade80;
+      text-decoration: line-through;
+    }
+    .fire-extinguishing { overflow: visible; }
+    .fire-extinguishing .fire {
+      animation: fireShrink 0.7s ease-out both;
+    }
+    .fire-extinguishing::after {
+      content: '';
+      position: absolute;
+      z-index: 8;
+      width: 46px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(77, 184, 255, 0.75);
+      box-shadow: 0 0 18px rgba(77, 184, 255, 0.95);
+      animation: waterBurst 0.7s ease-out both;
+      pointer-events: none;
+    }
+    .source-selected {
+      outline: 3px solid #ffd93d;
+      outline-offset: -3px;
+      box-shadow: inset 0 0 18px rgba(255, 217, 61, 0.35);
+    }
+    .hydrant-cell,
+    .firetruck-cell { cursor: pointer; overflow: visible; }
+    .source-active {
+      outline: 3px solid #4db8ff;
+      outline-offset: -3px;
+      box-shadow: inset 0 0 20px rgba(77, 184, 255, 0.45), 0 0 14px rgba(77, 184, 255, 0.5);
+    }
+    .water-switch {
+      position: absolute;
+      top: -17px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      min-width: 58px;
+      height: 17px;
+      padding: 0 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      border: 1px solid #ffbf3f;
+      border-radius: 9px;
+      background: #3b2c13;
+      color: #ffe29a;
+      font-size: 9px;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+      pointer-events: none;
+    }
+    .water-switch .switch-light {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ffb020;
+      box-shadow: 0 0 5px rgba(255,176,32,0.75);
+    }
+    .water-switch.switch-on {
+      border-color: #70d6ff;
+      background: #093c55;
+      color: #c9f1ff;
+    }
+    .water-switch.switch-on .switch-light {
+      background: #5ee7ff;
+      box-shadow: 0 0 9px rgba(94,231,255,1);
+      animation: switchPulse 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes switchPulse {
+      from { opacity: 0.65; transform: scale(0.85); }
+      to { opacity: 1; transform: scale(1.2); }
+    }
+    @keyframes fireShrink {
+      0% { opacity: 1; transform: scale(1.15); filter: none; }
+      55% { opacity: 0.8; transform: scale(0.75); filter: saturate(0.55); }
+      100% { opacity: 0.25; transform: scale(0.35); filter: grayscale(1); }
+    }
+    @keyframes waterBurst {
+      0% { opacity: 0; transform: translateY(18px) scaleX(0.25); }
+      30% { opacity: 1; transform: translateY(3px) scaleX(1); }
+      100% { opacity: 0; transform: translateY(-12px) scaleX(1.3); }
+    }
+
+    /* 水源 - 消火栓 */
+    .hydrant-cell { background: #1e2233; }
+    .hydrant {
+      width: 30px;
+      height: 36px;
+      background: #e63946;
+      border-radius: 6px 6px 4px 4px;
+      position: relative;
+      border: 2px solid #c1121f;
+    }
+    .hydrant::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 8px;
+      background: #c1121f;
+      border-radius: 4px 4px 0 0;
+    }
+    .hydrant::after {
+      content: '';
+      position: absolute;
+      top: 40%;
+      left: -4px;
+      width: 38px;
+      height: 6px;
+      background: #c1121f;
+      border-radius: 2px;
+    }
+    .hydrant-label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: #8a90a8;
+      white-space: nowrap;
+    }
+
+    /* 水源 - 消防车 */
+    .firetruck-cell { background: #1e2233; }
+    .firetruck {
+      width: 42px;
+      height: 28px;
+      background: #e63946;
+      border-radius: 4px 8px 2px 2px;
+      position: relative;
+      border: 2px solid #c1121f;
+    }
+    .firetruck::before {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 6px;
+      width: 8px;
+      height: 8px;
+      background: #333;
+      border-radius: 50%;
+    }
+    .firetruck::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      right: 6px;
+      width: 8px;
+      height: 8px;
+      background: #333;
+      border-radius: 50%;
+    }
+    .firetruck-cabin {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 12px;
+      height: 14px;
+      background: #a8dadc;
+      border-radius: 2px 4px 0 0;
+    }
+    .firetruck-label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: #8a90a8;
+      white-space: nowrap;
+    }
+
+    /* 灭火器拾取点 */
+    .extinguisher-cell { cursor: pointer; }
+    .extinguisher {
+      width: 20px;
+      height: 28px;
+      background: #4ade80;
+      border-radius: 4px 4px 6px 6px;
+      position: relative;
+      border: 2px solid #22c55e;
+      animation: bob 2s ease-in-out infinite;
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    .extinguisher::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 6px;
+      background: #333;
+      border-radius: 2px 2px 0 0;
+    }
+    .extinguisher::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 2px;
+      background: #fff;
+    }
+    .extinguisher-picked { opacity: 0.2; }
+    .extinguisher-picked .extinguisher { animation: none; }
+
+    /* 烟雾遮挡 */
+    .smoke-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(120, 120, 130, 0.75);
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 20;
+      animation: smokeFloat 3s ease-in-out infinite;
+    }
+    @keyframes smokeFloat {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 0.85; }
+    }
+    .smoke-overlay::before {
+      content: '烟';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 700;
+    }
+    .smoke-clearing {
+      animation: smokeClear 0.8s ease-out forwards;
+    }
+    @keyframes smokeClear {
+      0% { opacity: 0.75; }
+      100% { opacity: 0; }
+    }
+
+    /* 拆除高亮 */
+    .remove-highlight .pipe-segment {
+      background: #ffb84a !important;
+      box-shadow: 0 0 10px rgba(255, 184, 74, 0.8);
+    }
+    .remove-highlight .pipe-center {
+      background: #ffd166 !important;
+      box-shadow: 0 0 14px rgba(255, 184, 74, 0.9);
+      animation: removePulse 0.6s ease-in-out infinite alternate;
+    }
+    @keyframes removePulse {
+      from { box-shadow: 0 0 8px rgba(255, 184, 74, 0.6); }
+      to { box-shadow: 0 0 16px rgba(255, 184, 74, 1); }
+    }
+    .canvas-remove-mode .grid-cell {
+      cursor: crosshair;
+    }
+    .canvas-lay-mode .grid-cell {
+      cursor: grabbing;
+    }
+
+    /* 选中工具的高亮提示 */
+    .cell-highlight-pipe {
+      box-shadow: inset 0 0 0 2px #4db8ff;
+    }
+    .cell-highlight-extinguisher {
+      box-shadow: inset 0 0 0 2px #4ade80;
+    }
+
+    /* ===== 操作日志 ===== */
+    .log-panel {
+      width: 200px;
+      background: #252938;
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid #33384d;
+      max-height: 480px;
+      display: flex;
+      flex-direction: column;
+    }
+    .log-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #8a90a8;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #33384d;
+    }
+    .log-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .log-item {
+      font-size: 11px;
+      padding: 6px 8px;
+      background: #1e2130;
+      border-radius: 6px;
+      color: #b0b6cc;
+      line-height: 1.4;
+    }
+    .log-item.log-info { border-left: 3px solid #4db8ff; }
+    .log-item.log-success { border-left: 3px solid #4ade80; }
+    .log-item.log-warn { border-left: 3px solid #ffb84a; }
+    .log-item.log-error { border-left: 3px solid #ff6b6b; }
+
+    /* ===== 通关弹窗 ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal {
+      background: #252938;
+      border-radius: 16px;
+      padding: 40px 48px;
+      text-align: center;
+      border: 2px solid #4ade80;
+      animation: slideUp 0.4s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .modal h2 {
+      font-size: 28px;
+      font-weight: 900;
+      color: #4ade80;
+      margin-bottom: 8px;
+    }
+    .modal p {
+      color: #8a90a8;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .modal-btn {
+      background: #ff6b4a;
+      color: #fff;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .modal-btn:hover { background: #ff8a6a; }
+
+    /* ===== 提示气泡 ===== */
+    .tip-bubble {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ffb84a;
+      color: #1a1d29;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 50;
+      animation: tipPop 0.3s ease;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(255, 184, 74, 0.3);
+    }
+    @keyframes tipPop {
+      from { transform: translateX(-50%) translateY(10px); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    /* 底部说明 */
+    .footer-tip {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #5a6078;
+      text-align: center;
+    }
+  </style>
+<style data-inlined-from="prototype.css">
+body {display:block;padding:16px;color:#edf2ff;}
+#root {width:100%;}
+.prototype {max-width:850px;margin:auto;font-size:16px;}
+.prototype button {font:inherit;font-size:14px;border:1px solid #4b536b;border-radius:9px;background:#282e40;color:#e9edff;padding:10px 14px;cursor:pointer;min-height:44px;}
+.prototype button:hover {background:#394257;}
+.prototype button:focus-visible,.proto-cell:focus-visible {outline:3px solid #ffe096;outline-offset:-3px;}
+.prototype button:disabled {opacity:.4;cursor:default;}
+.prototype button.selected {background:#693b29;border-color:#ff9563;color:#fff2db;}
+.proto-header {display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;}
+.eyebrow {font-size:14px;color:#a7b4d0;letter-spacing:2px;}
+.proto-header h1 {font-size:26px;margin-top:4px;}
+.scene-badge {font-size:14px;color:#c2cce2;white-space:nowrap;}
+.level-tabs {display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.level-tabs button {flex:1;padding:9px 7px;white-space:nowrap;}
+.resource-strip {display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px;background:#242a3a;border-radius:12px;margin-bottom:12px;}
+.resource-strip span {font-size:14px;color:#b9c5dd;}
+.resource-strip strong {display:block;font-size:22px;color:#e8f2ff;margin-top:4px;}
+.play-toolbar {display:flex;gap:7px;flex-wrap:wrap;}
+.gesture-help {font-size:14px;line-height:1.7;color:#b8c7e3;margin:12px 0;}
+.board-shell {border-radius:12px;background:#222c40;padding:10px;transition:background 1s,box-shadow 1s;}
+.prototype-board {display:grid;grid-template-columns:repeat(12,minmax(0,1fr));width:100%;aspect-ratio:12/8;touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden;border-radius:6px;}
+.proto-cell {position:relative;min-width:0;min-height:0;border:1px solid #35415a;isolation:isolate;cursor:crosshair;}
+.proto-cell.solid {background:#141c2a;border-color:#273247;cursor:default;}
+.proto-cell.walkable {background:#2f3c50;}
+.scene-0 .walkable,.scene-1 .walkable {background:#303945;}
+.scene-0 .solid,.scene-1 .solid {background:#171f2a;}
+.scene-4 .walkable {background:#393548;}
+.scene-cleared {background:#153f48;box-shadow:0 0 32px #50d4b22b;}
+.scene-cleared .walkable {background:#294b50;transition:background 1s;}
+.proto-pipe {position:absolute;inset:0;z-index:1;pointer-events:none;}
+.pipe-arm {position:absolute;background:#8a8daf;box-shadow:inset 0 0 0 1px #bec7e038;}
+.dir-0,.dir-2 {width:18%;left:41%;height:52%;}
+.dir-0 {top:0;}.dir-2 {bottom:0;}
+.dir-1,.dir-3 {height:18%;top:41%;width:52%;}
+.dir-1 {right:0;}.dir-3 {left:0;}
+.pipe-node {position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:50%;background:#a4a9c5;}
+.wet .pipe-arm {background-color:#33b8f4;background-image:repeating-linear-gradient(90deg,transparent 0 7px,#b1f4ff 8px 11px,transparent 12px 20px);background-size:20px 20px;animation:pipeFlow .65s linear infinite;box-shadow:0 0 10px #43cfff88;}
+.wet .dir-0,.wet .dir-2 {background-image:repeating-linear-gradient(0deg,transparent 0 7px,#b1f4ff 8px 11px,transparent 12px 20px);animation-name:pipeFlowVertical;}
+.wet .pipe-node {background:#90eeff;box-shadow:0 0 10px #70eaff;}
+@keyframes pipeFlow {to{background-position:20px 0;}}
+@keyframes pipeFlowVertical {to{background-position:0 -20px;}}
+.proto-entity,.proto-source {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:3;pointer-events:none;}
+.proto-entity .fire {transform:scale(.85);}
+.proto-entity .big-fire {filter:drop-shadow(0 0 8px #ff631e);}
+.water-cost {position:absolute;bottom:0;right:1px;background:#55271fe8;border-radius:4px;padding:1px 3px;font-size:12px;color:#ffe2ad;z-index:5;white-space:nowrap;}
+.car-marker {position:absolute;bottom:3px;font-size:26px;opacity:.65;}
+.proto-entity .fire {z-index:2;}
+.wet .proto-entity .fire {animation:fireDouse .4s ease-out both;}
+@keyframes fireDouse {to{opacity:.25;transform:scale(.35);}}
+.source-state {position:absolute;top:0;left:0;font-size:12px;padding:0 2px;border-radius:3px;background:#4d371e;color:#ffe1a3;}
+.source-state.is-on {background:#124e63;color:#9ff4ff;}
+.pickup-label {position:absolute;bottom:0;right:0;font-size:12px;background:#133e32;color:#95f6c0;}
+.source-symbol {font-size:30px;line-height:1;}
+.source-amount {position:absolute;right:1px;bottom:0;border-radius:4px;padding:0 3px;font-size:12px;background:#182c49;color:#a2deff;}
+.proto-fog {position:absolute;inset:0;z-index:10;display:grid;place-items:center;font-size:12px;color:#d9e2ef;background:radial-gradient(ellipse at 30% 30%,#8293a5,#566475);animation:fogBreathe 3s ease-in-out infinite alternate;pointer-events:none;}
+@keyframes fogBreathe {to{filter:brightness(.85);}}
+.out-mark {color:#87ecc6;font-size:24px;animation:clearMark .6s ease-out both;}
+@keyframes clearMark {from{opacity:0;transform:scale(2);}to{opacity:1;transform:scale(1);}}
+.splash:after {content:'';position:absolute;inset:0;z-index:6;border:4px solid #b0efff;border-radius:50%;animation:waterSplash .7s ease-out both;pointer-events:none;}
+@keyframes waterSplash {from{opacity:1;transform:scale(.3);}to{opacity:0;transform:scale(1.6);}}
+.disconnected {position:absolute;right:3px;top:0;font-size:22px;color:#ffbb71;pointer-events:none;}
+.source-controls {display:flex;gap:10px;padding-top:10px;}
+.prototype .source-valve {flex:1;background:#523b24;border:2px solid #d59843;text-align:left;min-height:66px;}
+.source-valve span {font-size:16px;font-weight:700;display:block;}
+.source-valve small {font-size:13px;display:block;margin-top:5px;color:#e0cbb2;}
+.prototype .source-valve.on {border-color:#66d9ff;background:#10445e;box-shadow:inset 0 0 16px #55d7ff24;}
+.source-valve.on small {color:#afeaff;}
+.feedback {background:#242d40;border-left:3px solid #66caff;padding:12px 14px;margin-top:12px;min-height:48px;font-size:14px;line-height:1.6;}
+.hint-box {padding:12px;background:#443b27;color:#ffdf98;border-radius:8px;margin-top:8px;font-size:14px;line-height:1.6;}
+.legend {display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#a2aec6;margin:12px 0;}
+.completion {position:fixed;inset:0;z-index:100;background:#0a132b99;display:grid;place-items:center;animation:completionIn 1.4s both;}
+@keyframes completionIn {0%,65%{opacity:0;pointer-events:none;}100%{opacity:1;}}
+.completion>div {max-width:420px;width:90%;background:#253a45;border:1px solid #6bbaa5;border-radius:20px;padding:28px;text-align:center;box-shadow:0 20px 80px #0008;}
+.completion-icon {display:block;font-size:46px;color:#82e9b9;}
+.completion h2 {font-size:24px;margin:8px 0;}.completion p {color:#bcd6db;}
+.completion-actions {display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:22px;}
+@media(max-width:540px){body{padding:10px 6px;}.proto-header h1{font-size:22px;}.scene-badge{font-size:12px;}.resource-strip{gap:5px;padding:10px;}.resource-strip strong{font-size:19px;}.play-toolbar{gap:5px;}.prototype button{padding:8px;font-size:13px;}.board-shell{padding:4px;}.proto-entity .fire{transform:scale(.6);}.proto-entity .extinguisher{transform:scale(.7);}.source-symbol{font-size:22px;}.source-valve span{font-size:14px;}.source-controls{gap:5px;}.level-tabs button{flex-basis:30%;}.gesture-help{font-size:13px;}.source-valve small{font-size:12px;}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important;}}
+
+</style>
+</head>
+<body>
+
+  <div id="root"></div>
+
+  <script src="https://sf3-scmcdn-cn.feishucdn.com/obj/feishu-static/miaoda/coding-unpkg-sdk/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://sf3-scmcdn-cn.feishucdn.com/obj/feishu-static/miaoda/coding-unpkg-sdk/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://sf3-scmcdn-cn.feishucdn.com/obj/feishu-static/miaoda/coding-unpkg-sdk/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script data-inlined-from="game-core.js">
+/* Pure rules shared by the browser and regression tests. Coordinates: row,column. */
+(function (root) {
+  const cell = (r, c) => `${r},${c}`;
+  const coords = k => k.split(',').map(Number);
+  const around = k => { const [r,c] = coords(k); return [cell(r-1,c),cell(r,c+1),cell(r+1,c),cell(r,c-1)]; };
+  const fire = (id,r,c,water,hiddenBy) => ({id,k:cell(r,c),water,hiddenBy});
+  const source = (id,r,c,water,hiddenBy) => ({id,k:cell(r,c),water,hiddenBy});
+  const LEVELS = [
+    {name:'绕过车道',scene:'公路汽车',focus:'有限水管 · 路线选择',pipes:12,
+      map:['############','............','............','.....#......','.....#......','.....#......','.....#......','............'],
+      sources:[source('truck',6,1,30)],fires:[fire('car',2,8,30)],exts:[],
+      hints:['隔离带的上方和下方都能绕行，比较两条路线。','往上绕到第 3 行，再向右接近汽车，更省水管。','从消防车向上 4 格，向右 7 格，再开启水源。']},
+    {name:'近水与远水',scene:'公路汽车',focus:'有限水量 · 水源取舍',pipes:10,
+      map:['############','............','............','............','............','............','............','############'],
+      sources:[source('hydrant',5,1,Infinity),source('truck',5,9,30)],fires:[fire('near',5,7,10),fire('far',2,7,30)],exts:[],
+      hints:['消防车离得近，但水量不够处理两处火。','可以用消防车处理近处小火，再回收水管改接消防栓；也可以全部用消防栓。','消防栓向右铺 6 格、再向上铺 3 格，一次开闸可处理两处火。']},
+    {name:'留一罐给小火',scene:'居民楼',focus:'灭火器 · 灭火顺序',pipes:15,
+      map:['############','############','##..........','##..........','##..........','####.#####.#','............','############'],
+      sources:[source('truck',6,1,40)],fires:[fire('gate',6,5,10),fire('upSmall',3,4,10,'gate'),fire('upMedium',3,8,30,'gate')],exts:[{id:'ext',k:cell(6,3)}],
+      hints:['水量不足以处理所有火，但楼下有一罐灭火器。','灭火器可以用于楼下小火，也可以保留给楼上的小火。','拾取灭火器处理楼下小火；水管沿左侧楼梯向上，连接两处楼上火点。']},
+    {name:'烟后的出水口',scene:'居民楼',focus:'关键火点 · 发现水源',pipes:12,
+      map:['############','############','##..........','##..........','##..........','####.#####.#','............','############'],
+      sources:[source('truck',6,1,30),source('hydrant',4,4,Infinity,'gate')],fires:[fire('gate',6,5,30),fire('upper',3,9,60),fire('lower',6,10,30)],exts:[],
+      hints:['消防车只能处理一处火。烟雾里还能看到消防设施标记。','先处理楼下靠左的中火，显露楼内出水口。','消防车向右 4 格开闸；停水回收。用楼内水源向上、向右再经右侧楼梯向下连接剩余火点。']},
+    {name:'让商场恢复安静',scene:'商场',focus:'分支管网 · 连续清场',pipes:22,
+      map:['############','##..........','##..........','##..........','##..........','####.#####.#','............','############'],
+      sources:[source('hydrant',6,1,Infinity)],fires:[fire('a',6,4,10),fire('b',3,4,30),fire('c',3,8,30),fire('d',6,10,60),fire('e',2,10,10)],exts:[],
+      hints:['这一关可以先连好所有分支，再一次开闸。','利用左右两个楼梯口，把二楼横向管线作为公共干线。','从水源到左侧楼梯，上楼后向右铺到最右侧火点所在列，再向上、向下分支。']}
+  ];
+  function initial(level) { return {pipes:[],out:[],picked:[],ext:0,water:Object.fromEntries(level.sources.map(s=>[s.id,s.water])),open:{},tick:0,wet:[],outAt:{},message:'从水源或已有水管划向空格开始铺管。'}; }
+  const visible = (entity,state) => !entity.hiddenBy || state.out.includes(entity.hiddenBy);
+  const visibleSources = (level,state) => level.sources.filter(s=>visible(s,state));
+  function passable(level,state,k) {
+    const [r,c]=coords(k);
+    return level.map[r]?.[c]==='.' && ![...level.fires,...level.sources,...level.exts].some(e=>e.k===k && !visible(e,state));
+  }
+  function network(level,state,src) {
+    const distances=new Map([[src.k,0]]), queue=[src.k], pipes=new Set(state.pipes);
+    for(let i=0;i<queue.length;i++) for(const k of around(queue[i])) {
+      if(pipes.has(k) && !distances.has(k) && passable(level,state,k)) {distances.set(k,distances.get(queue[i])+1);queue.push(k);}
+    }
+    return distances;
+  }
+  const flowing = state => Object.keys(state.open).length>0;
+  function beginStroke(level,state,k) {
+    if(flowing(state)) return {state:{...state,message:'先关闭水源开关，再调整水管。'},stroke:null};
+    const isSource=visibleSources(level,state).some(s=>s.k===k);
+    let next=state;
+    if(!state.pipes.includes(k) && !isSource) {
+      const anchors=new Set([...state.pipes,...visibleSources(level,state).map(s=>s.k)]);
+      if(!passable(level,state,k) || !around(k).some(n=>anchors.has(n))) return {state:{...state,message:'从水源或已有水管旁边开始划。'},stroke:null};
+      if(state.pipes.length>=level.pipes) return {state:{...state,message:'水管用完了，沿已有水管划动可回收。'},stroke:null};
+      next={...state,pipes:[...state.pipes,k],message:'铺设水管'};
+    }
+    return {state:next,stroke:{last:k,anchor:true,seen:[k]}};
+  }
+  function stepStroke(level,state,stroke,k) {
+    if(!stroke || k===stroke.last || !around(stroke.last).includes(k)) return {state,stroke};
+    if(!passable(level,state,k)) return {state,stroke};
+    const isSource=visibleSources(level,state).some(s=>s.k===k);
+    const existed=state.pipes.includes(k);
+    // Keep the previous cell's sampled occupancy: deleting it must not break the next removal.
+    if(stroke.seen.includes(k)) return {state,stroke:{...stroke,last:k,anchor:true}};
+    let next=state;
+    if(stroke.anchor && !isSource) {
+      if(existed) next={...state,pipes:state.pipes.filter(p=>p!==k),message:'回收水管'};
+      else if(state.pipes.length<level.pipes) next={...state,pipes:[...state.pipes,k],message:'铺设水管'};
+      else return {state:{...state,message:'水管已用完，沿已有管线划动回收。'},stroke};
+    }
+    return {state:next,stroke:{last:k,anchor:true,seen:[...stroke.seen,k]}};
+  }
+  // Fill skipped pointer cells along a grid line. Never jump through walls or fog.
+  function dragTo(level,state,stroke,target) {
+    if(!stroke) return {state,stroke};
+    const [tr,tc]=coords(target); let next=state, current=stroke;
+    for(let i=0;i<40 && current.last!==target;i++) {
+      const [r,c]=coords(current.last), dr=tr-r,dc=tc-c;
+      const k=Math.abs(dc)>=Math.abs(dr)?cell(r,c+Math.sign(dc)):cell(r+Math.sign(dr),c);
+      const moved=stepStroke(level,next,current,k);
+      if(moved.stroke.last===current.last) break;
+      next=moved.state;current=moved.stroke;
+    }
+    return {state:next,stroke:current};
+  }
+  function toggle(level,state,id) {
+    const src=visibleSources(level,state).find(s=>s.id===id); if(!src)return state;
+    const open={...state.open};
+    if(id in open){delete open[id];return {...state,open,wet:[],message:'已停水，可以调整管线。'};}
+    if(state.water[id]<=0)return {...state,message:'消防车水已用完，可以撤回供水或寻找其他水源。'};
+    open[id]=state.tick;return {...state,open,message:'已开闸，水沿管网前进。'};
+  }
+  function advance(level,state) {
+    if(!flowing(state))return state;
+    const next={...state,tick:state.tick+1,water:{...state.water},out:[...state.out],outAt:{...state.outAt}},wet=new Set();
+    // Open order is an explicit player decision; a fire is charged to one source only.
+    for(const id of Object.keys(state.open)) {
+      const src=visibleSources(level,next).find(s=>s.id===id);if(!src || next.water[id]<=0)continue;
+      const distances=network(level,next,src),elapsed=next.tick-state.open[id];
+      for(const [k,d] of distances)if(d<=elapsed)wet.add(k);
+      const targets=level.fires.filter(f=>!next.out.includes(f.id)&&visible(f,next)&&distances.has(f.k))
+        .sort((a,b)=>distances.get(a.k)-distances.get(b.k)||a.id.localeCompare(b.id));
+      for(const f of targets) {
+        if(elapsed<distances.get(f.k)+3)continue;
+        if(next.water[id]<f.water){next.message='消防车余水不足；可以停水改接消防栓，或撤回后用灭火器节水。';continue;}
+        next.water[id]-=f.water;next.out.push(f.id);next.outAt[f.id]=next.tick;
+        next.message=f.hiddenBy?'隐藏区域的火已扑灭。':'火已扑灭，继续观察现场。';
+        if([...level.sources,...level.fires,...level.exts].some(e=>e.hiddenBy===f.id))next.message='烟雾散开了，发现新的消防资源或火点！';
+      }
+    }
+    next.wet=[...wet];return next;
+  }
+  function useExt(level,state,k) {
+    const f=level.fires.find(f=>f.k===k&&!state.out.includes(f.id)&&visible(f,state));
+    if(!f)return state;
+    if(f.water>10)return {...state,message:'灭火器适合小火，这处火需要水管供水。'};
+    if(!state.ext)return {...state,message:'没有灭火器，先拾取场景中的绿色灭火器。'};
+    return {...state,ext:state.ext-1,out:[...state.out,f.id],outAt:{...state.outAt,[f.id]:state.tick},message:'小火已扑灭，节省了水量。'};
+  }
+  const api={LEVELS,cell,coords,around,initial,visible,visibleSources,passable,network,flowing,beginStroke,stepStroke,dragTo,toggle,advance,useExt};
+  if(typeof module!=='undefined')module.exports=api;else root.FireGameCore=api;
+})(globalThis);
+
+</script>
+<script type="text/babel" data-inlined-from="game.jsx">
+const {useState,useEffect,useRef}=React;
+const C=FireGameCore;
+function Game(){
+  const [levelIndex,setLevelIndex]=useState(0),level=C.LEVELS[levelIndex];
+  const [state,setState]=useState(()=>C.initial(level));
+  const stateRef=useRef(state),gesture=useRef(null),history=useRef([]),boardRef=useRef(null);
+  const [tool,setTool]=useState('pipe'),[hint,setHint]=useState(-1),[completed,setCompleted]=useState([]);
+  const [historyCount,setHistoryCount]=useState(0),[winDismissed,setWinDismissed]=useState(false);
+  const publish=next=>{stateRef.current=next;setState(next);};
+  const remember=previous=>{history.current.push(previous);setHistoryCount(history.current.length);};
+  const meaningful=(a,b)=>a.pipes.join('|')!==b.pipes.join('|')||a.out.join('|')!==b.out.join('|')||a.picked.join('|')!==b.picked.join('|')||JSON.stringify(a.open)!==JSON.stringify(b.open);
+  const act=fn=>{const before=stateRef.current,next=fn(before);if(meaningful(before,next))remember(before);publish(next);};
+  const won=state.out.length===level.fires.length;
+  useEffect(()=>{const timer=setInterval(()=>{const prev=stateRef.current,next=C.advance(level,prev);if(next!==prev)publish(next);},110);return ()=>clearInterval(timer);},[levelIndex]);
+  useEffect(()=>{if(won)setCompleted(list=>list.includes(levelIndex)?list:[...list,levelIndex]);},[won,levelIndex]);
+  const cancelGesture=()=>{if(gesture.current){publish(gesture.current.before);gesture.current=null;}};
+  useEffect(()=>{const cancel=()=>cancelGesture(),visibility=()=>{if(document.hidden)cancel();};window.addEventListener('blur',cancel);document.addEventListener('visibilitychange',visibility);return ()=>{window.removeEventListener('blur',cancel);document.removeEventListener('visibilitychange',visibility);};},[]);
+  function load(index){gesture.current=null;history.current=[];setHistoryCount(0);setHint(-1);setTool('pipe');setWinDismissed(false);setLevelIndex(index);publish(C.initial(C.LEVELS[index]));}
+  function undo(){cancelGesture();const prev=history.current.pop();if(prev){publish({...prev,message:'已撤回整次操作，水量、管线和遮挡同步恢复。'});setHistoryCount(history.current.length);setWinDismissed(false);}}
+  function toggle(id){cancelGesture();act(s=>C.toggle(level,s,id));}
+  function pickup(k){const ext=level.exts.find(e=>e.k===k&&C.visible(e,stateRef.current)&&!stateRef.current.picked.includes(e.id));if(!ext)return false;act(s=>({...s,picked:[...s.picked,ext.id],ext:s.ext+1,message:'拾取一罐灭火器，可用于任意小火。'}));return true;}
+  function tap(k){
+    const s=stateRef.current,src=C.visibleSources(level,s).find(v=>v.k===k);
+    if(src){toggle(src.id);return;}if(pickup(k))return;
+    if(tool==='extinguisher'){act(s=>C.useExt(level,s,k));return;}
+    if(C.flowing(s)){publish({...s,message:'先关闭水源开关，再调整管线。'});return;}
+    if(s.pipes.includes(k)){act(s=>({...s,pipes:s.pipes.filter(p=>p!==k),message:'回收一段水管。'}));return;}
+    const result=C.beginStroke(level,s,k);if(meaningful(s,result.state))remember(s);publish(result.state);
+  }
+  function pointerCell(e){const rect=boardRef.current.getBoundingClientRect(),col=Math.floor((e.clientX-rect.left)/rect.width*12),row=Math.floor((e.clientY-rect.top)/rect.height*8);return row>=0&&row<8&&col>=0&&col<12?C.cell(row,col):null;}
+  function down(e){
+    if(e.button!==0||gesture.current)return;const k=pointerCell(e);if(!k)return;
+    e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);
+    const before=stateRef.current,source=C.visibleSources(level,before).some(s=>s.k===k),ext=level.exts.some(x=>x.k===k&&C.visible(x,before)&&!before.picked.includes(x.id));
+    let result={state:before,stroke:null};
+    if(tool==='pipe'&&!ext&&(!source||!C.flowing(before)))result=C.beginStroke(level,before,k);
+    gesture.current={id:e.pointerId,start:k,before,stroke:result.stroke,moved:false,x:e.clientX,y:e.clientY};publish(result.state);
+  }
+  function move(e){const g=gesture.current;if(!g||g.id!==e.pointerId)return;const k=pointerCell(e);if(Math.hypot(e.clientX-g.x,e.clientY-g.y)>7)g.moved=true;if(!k||!g.stroke||k===g.stroke.last)return;const result=C.dragTo(level,stateRef.current,g.stroke,k);g.stroke=result.stroke;publish(result.state);}
+  function up(e){const g=gesture.current;if(!g||g.id!==e.pointerId)return;move(e);gesture.current=null;if(!g.moved){publish(g.before);tap(g.start);}else if(meaningful(g.before,stateRef.current)){remember(g.before);}if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);}
+  const connected=new Set();C.visibleSources(level,state).forEach(src=>C.network(level,state,src).forEach((d,k)=>connected.add(k)));
+  const pipes=new Set(state.pipes),wet=new Set(state.wet),sources=C.visibleSources(level,state),anyOpen=C.flowing(state);
+  const junctions=new Set([...state.pipes,...sources.map(s=>s.k)]);
+  return <div className="prototype">
+    <header className="proto-header"><div><div className="eyebrow">消防调度救援</div><h1>{level.name}</h1></div><span className="scene-badge">{level.scene} · {levelIndex+1} / 5</span></header>
+    <nav className="level-tabs" aria-label="选择关卡">{C.LEVELS.map((l,i)=><button key={l.name} className={i===levelIndex?'selected':''} aria-current={i===levelIndex?'step':undefined} onClick={()=>load(i)}>{completed.includes(i)?'✓':i+1} {l.name}</button>)}</nav>
+    <div className="resource-strip"><span>水管 <strong>{level.pipes-state.pipes.length}/{level.pipes}</strong></span><span>消防车 <strong>{state.water.truck===undefined?'—':state.water.truck} 水</strong></span><span>灭火器 <strong>{state.ext}</strong></span><span>火点 <strong>{level.fires.length-state.out.length}/{level.fires.length}</strong></span></div>
+    <div className="play-toolbar"><button className={tool==='pipe'?'selected':''} onClick={()=>{cancelGesture();setTool('pipe');}}>水管 · 划动铺拆</button><button className={tool==='extinguisher'?'selected':''} onClick={()=>{cancelGesture();setTool('extinguisher');}}>🧯 灭火器</button><button disabled={!historyCount} onClick={undo}>↶ 撤回一步</button><button onClick={()=>setHint(i=>Math.min(i+1,2))}>提示</button><button onClick={()=>load(levelIndex)}>重来</button></div>
+    <p className="gesture-help">已有管 → 已有管：回收　 ·　 已有管 → 空格：铺设<br/>点击单格也可铺拆，开关控制通水。</p>
+    <div className={`board-shell scene-${levelIndex} ${won?'scene-cleared':''}`}>
+      <div className="prototype-board" ref={boardRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancelGesture} onLostPointerCapture={()=>{if(gesture.current)cancelGesture();}} aria-label={`${level.scene}火场网格`}>
+        {level.map.flatMap((line,r)=>[...line].map((tile,c)=>{
+          const k=C.cell(r,c),hasPipe=pipes.has(k),hasWater=wet.has(k),f=level.fires.find(f=>f.k===k),src=sources.find(s=>s.k===k),ext=level.exts.find(x=>x.k===k);
+          const hidden=[...level.sources,...level.fires,...level.exts].filter(e=>e.k===k&&!C.visible(e,state));
+          const out=f&&state.out.includes(f.id),recent=out&&state.tick-(state.outAt[f.id]||0)<7;
+          const desc=hidden.length?'烟雾遮挡':src?(src.id==='truck'?'消防车':'消防栓'):f?(out?'已扑灭':`火点，需要 ${f.water} 水`):ext&&!state.picked.includes(ext.id)?'拾取灭火器':hasPipe?'已有水管':'空格';
+          return <div key={k} data-cell={k} role={tile==='.'?'button':undefined} tabIndex={tile==='.'?0:undefined} aria-label={`${r+1}行${c+1}列，${desc}`} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tap(k);}}} className={`proto-cell ${tile==='#'?'solid':'walkable'} ${hasPipe?'has-pipe':''} ${hasWater?'wet':''} ${out?'extinguished':''} ${recent?'splash':''}`}>
+            {(hasPipe||src)&&<div className="proto-pipe">{C.around(k).map((n,i)=>junctions.has(n)&&<i key={i} className={`pipe-arm dir-${i}`}/>)}{hasPipe&&<i className="pipe-node"/>}</div>}
+            {f&&!hidden.length&&<div className="proto-entity">{levelIndex<2&&<span className="car-marker">🚗</span>}{out?<span className="out-mark">✓</span>:<><div className={`fire ${f.water===60?'big-fire':''}`}><div className="fire-flame"/><div className="fire-flame-inner"/></div><span className="water-cost">{f.water}水</span></>}</div>}
+            {ext&&!hidden.length&&!state.picked.includes(ext.id)&&<div className="proto-entity"><div className="extinguisher"/><span className="pickup-label">拾取</span></div>}
+            {src&&<div className="proto-source"><span className="source-symbol">{src.id==='truck'?'🚒':'🚰'}</span><span className={`source-state ${src.id in state.open?'is-on':''}`}>{src.id in state.open?'开':'关'}</span><span className="source-amount">{state.water[src.id]===Infinity?'∞':state.water[src.id]}</span></div>}
+            {hidden.length>0&&<div className="proto-fog">{hidden.some(e=>level.sources.includes(e))?'▧ 消防':'烟雾'}</div>}
+            {hasPipe&&!connected.has(k)&&<span className="disconnected" title="未连接水源">·</span>}
+          </div>;
+        }))}
+      </div>
+      <div className="source-controls">{sources.map(s=>{const distances=C.network(level,state,s),demand=level.fires.filter(f=>!state.out.includes(f.id)&&C.visible(f,state)&&distances.has(f.k)).reduce((sum,f)=>sum+f.water,0);return <button key={s.id} className={`source-valve ${s.id in state.open?'on':''}`} aria-pressed={s.id in state.open} onClick={()=>toggle(s.id)}><span>{s.id==='truck'?'🚒 消防车':'🚰 消防栓'} · {s.id in state.open?'关闭水源':'开闸通水'}</span><small>{s.id in state.open?'水源已开启':`已接火点需要 ${demand} 水`} · 可用 {state.water[s.id]===Infinity?'∞':state.water[s.id]}</small></button>;})}</div>
+    </div>
+    <div className="feedback" role="status" aria-live="polite">{state.message}</div>
+    {hint>=0&&<div className="hint-box">💡 {level.hints[hint]}</div>}
+    <div className="legend"><span>灰紫：干管</span><span>蓝色流动：已通水</span><span>灰雾：待发现</span><span>{anyOpen?'先停水再改管':'水管可无损回收'}</span></div>
+    {won&&!winDismissed&&<div className="completion" role="dialog" aria-modal="true" aria-label="火情已解除"><div><span className="completion-icon">✓</span><h2>火情已解除</h2><p>{level.scene}恢复了平静。</p><div className="completion-actions">{levelIndex<4?<button onClick={()=>load(levelIndex+1)}>下一处事故 →</button>:<button onClick={()=>load(0)}>重新体验五关</button>}<button onClick={()=>setWinDismissed(true)}>看看现场</button><button onClick={()=>{setWinDismissed(true);undo();}}>撤回最后一步</button></div></div></div>}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Game/>);
+
+  </script>
+</body>
+</html>

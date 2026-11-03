@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.wrangler/
+.sites-runtime/
+.env
+.env.*
+!.env.example
+*.tar.gz
+*.log
+.DS_Store
+Thumbs.db
+library/
+temp/

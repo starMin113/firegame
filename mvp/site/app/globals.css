@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: #1a1d29;
+}
+
+.site-shell {
+  width: 100%;
+  min-height: 100vh;
+  background: #1a1d29;
+}
+
+.game-frame {
+  display: block;
+  width: 100%;
+  height: 100vh;
+  border: 0;
+  background: #1a1d29;
+}
